@@ -8,7 +8,30 @@ This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute
 Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
 
 ```{r}
-plot(cars)
+getwd()
+
+games <- read.csv("../../nfl-big-data-bowl-2024/games.csv")
+players <- read.csv("../../nfl-big-data-bowl-2024/players.csv")
+players <- read.csv("../../nfl-big-data-bowl-2024/players.csv")
+plays <- read.csv("../../nfl-big-data-bowl-2024/plays.csv")
+tackles <- read.csv("../../nfl-big-data-bowl-2024/tackles.csv")
+tracking_week_1 <- read.csv("../../nfl-big-data-bowl-2024/tracking_week_1.csv")
+tracking_week_2 <- read.csv("../../nfl-big-data-bowl-2024/tracking_week_2.csv")
+tracking_week_3 <- read.csv("../../nfl-big-data-bowl-2024/tracking_week_3.csv")
+tracking_week_4 <- read.csv("../../nfl-big-data-bowl-2024/tracking_week_4.csv")
+tracking_week_5 <- read.csv("../../nfl-big-data-bowl-2024/tracking_week_5.csv")
+tracking_week_6 <- read.csv("../../nfl-big-data-bowl-2024/tracking_week_6.csv")
+tracking_week_7 <- read.csv("../../nfl-big-data-bowl-2024/tracking_week_7.csv")
+tracking_week_8 <- read.csv("../../nfl-big-data-bowl-2024/tracking_week_8.csv")
+tracking_week_9 <- read.csv("../../nfl-big-data-bowl-2024/tracking_week_9.csv")
+
+
+tracking_week_1
+
+
+
+
+
 ```
 
 Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
