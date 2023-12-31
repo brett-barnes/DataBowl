@@ -1,17 +1,19 @@
 ---
-title: "R Notebook"
-output: html_notebook
+title: 'Big Data Bowl'
+output:
+  html_document:
+    theme: simplex
+    highlight: pygments
+    #css: "../css/note-style.css"
+  pdf_document: default
 ---
 
-This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
 
-Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
-
+First, we import all of the data.
 ```{r}
-getwd()
+#getwd()
 
 games <- read.csv("../../nfl-big-data-bowl-2024/games.csv")
-players <- read.csv("../../nfl-big-data-bowl-2024/players.csv")
 players <- read.csv("../../nfl-big-data-bowl-2024/players.csv")
 plays <- read.csv("../../nfl-big-data-bowl-2024/plays.csv")
 tackles <- read.csv("../../nfl-big-data-bowl-2024/tackles.csv")
@@ -24,17 +26,56 @@ tracking_week_6 <- read.csv("../../nfl-big-data-bowl-2024/tracking_week_6.csv")
 tracking_week_7 <- read.csv("../../nfl-big-data-bowl-2024/tracking_week_7.csv")
 tracking_week_8 <- read.csv("../../nfl-big-data-bowl-2024/tracking_week_8.csv")
 tracking_week_9 <- read.csv("../../nfl-big-data-bowl-2024/tracking_week_9.csv")
+library(dplyr)
 
+```
+Now, I concatenate every week into one dataframe, joined to the tackle dataframe, and clean out unnecessary columns.
+```{r}
 
-tracking_week_1
+library(dplyr)
 
+# Assuming 'gameId', 'playId', and 'nflId' are the columns you want to use for the surrogate key
+surrogate_key_function <- function(df) {
+  df %>%
+    mutate(surrogate_key = paste0(gameId, playId, nflId))
+}
 
+# Create a list of data frames
+totalList <- list(tracking_week_1, tracking_week_2, tracking_week_3, tracking_week_4, tracking_week_5, tracking_week_6, tracking_week_7, tracking_week_8, tracking_week_9)
 
+# Apply the surrogate_key_function to each data frame in totalList
+totalList <- lapply(totalList, surrogate_key_function)
+
+# Load the tackles data
+tackles <- tackles %>%
+  mutate(surrogate_key = paste0(gameId, playId, nflId))
+
+# Initialize an empty dataframe to store the concatenated results
+combined_df <- data.frame()
+
+columns_to_remove <- c("forcedFumble", "frameId", "time", "x", "y", "s", "a", "dis", "o", "playDirection", "dir", "jerseyNumber", "pff_missedTackle")
+
+# Loop through each week, perform filtering, and concatenate the results
+for (i in seq_along(totalList)) {
+  week_t <- inner_join(tackles, totalList[[i]], by = "surrogate_key")
+  week_t_filtered <- week_t %>% filter((event == "tackle" | event == "out_of_bounds"))
+  week_t_cleaned <- week_t_filtered %>% select(-columns_to_remove)
+  combined_df <- bind_rows(combined_df, week_t_cleaned)
+}
+
+# Clear the surrogate key and duplicates now that they are no longer needed
+
+col <- c("surrogate_key", "gameId.y", "playId.y", "nflId.y")
+combined_df <- combined_df %>% select(-col)
+# Arrange the combined dataframe
+combined_df_ordered <- combined_df %>% arrange(gameId.x, nflId.x, playId.x)
+
+# Print the ordered combined dataframe
+head(combined_df_ordered, 25)
 
 
 ```
 
-Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
 
 When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
 
