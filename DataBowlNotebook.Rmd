@@ -29,7 +29,7 @@ tracking_week_9 <- read.csv("../../nfl-big-data-bowl-2024/tracking_week_9.csv")
 library(dplyr)
 
 ```
-Now, I concatenate every week into one dataframe, joined to the tackle dataframe, and clean out unnecessary columns.
+Now, I concatenate every week into one dataframe, join to the tackle dataframe, and clean out unnecessary columns.
 ```{r}
 
 library(dplyr)
@@ -53,30 +53,80 @@ tackles <- tackles %>%
 # Initialize an empty dataframe to store the concatenated results
 combined_df <- data.frame()
 
-columns_to_remove <- c("forcedFumble", "frameId", "time", "x", "y", "s", "a", "dis", "o", "playDirection", "dir", "jerseyNumber", "pff_missedTackle")
+columns_to_remove <- c("forcedFumble", "frameId", "time", "x", "y", "s", "a", "dis", "o", "playDirection", "dir", "jerseyNumber")
 
 # Loop through each week, perform filtering, and concatenate the results
 for (i in seq_along(totalList)) {
   week_t <- inner_join(tackles, totalList[[i]], by = "surrogate_key")
-  week_t_filtered <- week_t %>% filter((event == "tackle" | event == "out_of_bounds"))
+  week_t_filtered <- distinct(week_t)
   week_t_cleaned <- week_t_filtered %>% select(-columns_to_remove)
   combined_df <- bind_rows(combined_df, week_t_cleaned)
 }
 
 # Clear the surrogate key and duplicates now that they are no longer needed
 
-col <- c("surrogate_key", "gameId.y", "playId.y", "nflId.y")
+col <- c("surrogate_key", "gameId.y", "playId.y", "nflId.y", "event")
 combined_df <- combined_df %>% select(-col)
 # Arrange the combined dataframe
-combined_df_ordered <- combined_df %>% arrange(gameId.x, nflId.x, playId.x)
-
+baseframe <- combined_df %>% arrange(gameId.x, nflId.x, playId.x)
+names(baseframe) <- c("gameID", "playID", "nflID", "tackle", "assist", "missedTackle", "playerName", "club")
+baseframe <- distinct(baseframe)
 # Print the ordered combined dataframe
-head(combined_df_ordered, 25)
+head(baseframe, 55)
 
 
 ```
+Now, I will calculate tackling percentage for each player. First, I'll count their number of attempted tackles (includes successful, assisted, and missed tackles) in the sample set.
+
+```{r}
 
 
-When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+#names(name_counts) <- c("playerName", "tackleAttempts")
+#print(name_counts)
 
-The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
+
+attemptFrame <- baseframe %>%
+  count(playerName)
+
+
+
+
+
+tackleF <- baseframe %>%
+  filter(tackle == 1) %>%
+  count(playerName)
+
+assistF <- baseframe %>%
+  filter(assist == 1) %>%
+  count(playerName)
+
+missedF <- baseframe %>%
+  filter(missedTackle == 1) %>%
+  count(playerName)
+
+
+resultF <- inner_join(tackleF, assistF, by = "playerName")
+resultF <- inner_join(resultF, missedF, by = "playerName")
+
+names(resultF) <- c("playerName", "tackles", "assists", "misses")
+
+resultF <- resultF %>% mutate(attempted = tackles + assists + misses) ### BECAUSE SOME PLAYS A GUY DOES 2
+
+
+resultF <- resultF %>% arrange(playerName)
+head(resultF,25)
+```
+
+
+
+Now, I'll calculate their tackle percentage. Before doing this, I'll calculate their weighted tackle total, which counts assists as half a tackle.
+
+```{r}
+resultF <- resultF %>% mutate(weightedTack = tackles + .5*assists)
+
+resultF <- resultF %>% mutate(tacklePerc = weightedTack / attempted)
+head(resultF, 25)
+```
+
+
+
