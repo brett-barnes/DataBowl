@@ -69,13 +69,15 @@ col <- c("surrogate_key", "gameId.y", "playId.y", "nflId.y", "event")
 combined_df <- combined_df %>% select(-col)
 # Arrange the combined dataframe
 baseframe <- combined_df %>% arrange(gameId.x, nflId.x, playId.x)
-names(baseframe) <- c("gameID", "playID", "nflID", "tackle", "assist", "missedTackle", "playerName", "club")
+names(baseframe) <- c("gameId", "playId", "nflId", "tackle", "assist", "missedTackle", "displayName", "club")
 baseframe <- distinct(baseframe)
 # Print the ordered combined dataframe
 head(baseframe, 55)
 
 
 ```
+
+
 Now, I will calculate tackling percentage for each player. First, I'll count their number of attempted tackles (includes successful, assisted, and missed tackles) in the sample set.
 
 ```{r}
@@ -86,7 +88,7 @@ Now, I will calculate tackling percentage for each player. First, I'll count the
 
 
 attemptFrame <- baseframe %>%
-  count(playerName)
+  count(displayName)
 
 
 
@@ -94,19 +96,19 @@ attemptFrame <- baseframe %>%
 
 tackleF <- baseframe %>%
   filter(tackle == 1) %>%
-  count(playerName)
+  count(displayName)
 
 assistF <- baseframe %>%
   filter(assist == 1) %>%
-  count(playerName)
+  count(displayName)
 
 missedF <- baseframe %>%
   filter(missedTackle == 1) %>%
-  count(playerName)
+  count(displayName)
 
 
-resultF <- inner_join(tackleF, assistF, by = "playerName")
-resultF <- inner_join(resultF, missedF, by = "playerName")
+resultF <- inner_join(tackleF, assistF, by = "displayName")
+resultF <- inner_join(resultF, missedF, by = "displayName")
 
 names(resultF) <- c("playerName", "tackles", "assists", "misses")
 
@@ -128,5 +130,99 @@ resultF <- resultF %>% mutate(tacklePerc = weightedTack / attempted)
 head(resultF, 25)
 ```
 
+Now, I will calculate ball-carriers' weighted forced missed tackle percentage (FMT). I will do this by joining the Plays database to my baseframe, then following similarly to how I calculated Weighted Tackle Percentage.
+
+```{r}
+
+new_base <- baseframe %>% mutate(surrogate_key = paste0(gameId, playId))
+new_plays <- plays %>% mutate(surrogate_key = paste0(gameId, playId))
+
+oFrame <- left_join(new_base, new_plays, by = "surrogate_key")
+
+selected <- c("gameId.x", "playId.x", "nflId", "tackle", "assist", "missedTackle", "displayName", "ballCarrierId", "ballCarrierDisplayName", "surrogate_key")
+
+new_base <- oFrame[selected]
+
+#col <- c("gameId.y", "playDescription", "quarter", "down", "yardsToGo", "possessionTeam", "defensiveTeam", "yardlineSide", "yardlineNumber", "gameClock", "preSnapHomeScore", "preSnapVisitorScore", "club", "passResult", "passLength", "prePenaltyPlayResult", "penaltyYards", "playResult", "playNullifiedByPenalty", "absoluteYardlineNumber", "offensiveFormation", "defendersInTheBox")
+#oFrame <- oFrame %>% select(-col)
+
+names(new_base) <- c("gameId", "playId", "nflId", "tackle", "assist", "missedTackle", "displayName", "ballCarrierId", "ballCarrierDisplayName", "surrogate_key")
+print(new_base)
 
 
+```
+
+```{r}
+
+selected_column <- "surrogate_key"
+
+# Create a new dataframe with only the selected column
+resultOF <- data.frame(surrogate_key = new_base[[selected_column]])
+
+
+O_attemptFrame <- new_base %>%
+  count(ballCarrierDisplayName)
+
+O_tackleF <- new_base %>%
+  filter(tackle == 1) %>%
+  count(ballCarrierDisplayName)
+
+#names(O_tackleF) <- c("ballCarrierDisplayName", "tackle")
+#O_assistF <- new_base %>%
+  #filter(assist == 1) %>%
+  #count(ballCarrierDisplayName)
+
+#####
+O_assistF <- new_base %>%
+  filter(assist == 1) %>%
+  distinct(ballCarrierDisplayName, surrogate_key) %>%
+  group_by(ballCarrierDisplayName) %>%                  ### SO WE DON'T COUNT 5 GUYS TACKLING A CARRIER AS 5 UNIQUE TACKLES
+  summarise(assists = n())
+
+#####
+
+O_missedF <- new_base %>%
+  filter(missedTackle == 1) %>%
+  count(ballCarrierDisplayName)
+
+
+resultOF <- inner_join(O_tackleF, O_assistF, by = "ballCarrierDisplayName")
+resultOF <- inner_join(resultOF, O_missedF, by = "ballCarrierDisplayName")
+
+names(resultOF) <- c("ballCarrierDisplayName", "tackles", "assisted_tackles", "misses")
+
+resultOF <- resultOF %>% mutate(attempted = tackles + assisted_tackles + misses) ### BECAUSE SOME PLAYS A GUY DOES 2
+
+
+resultOF <- resultOF %>% arrange(ballCarrierDisplayName)
+head(resultOF,25)
+```
+```{r}
+new_resultOF <- resultOF
+
+new_resultOF <- new_resultOF %>% mutate(FMT = misses / attempted)
+
+col <- c("tackles", "assisted_tackles")
+new_resultOF <- new_resultOF %>% select(-col)
+
+head(new_resultOF, 25)
+```
+
+Now, I can calculate tackling efficiency by measuring how defenders tackle hard-to-tackle ball carriers. This will be done by weighting every tackling by the ball carrier's FMT. We will first rule out anyone below a minimum of 10 tackles attempted on them within the sample set. This will help ensure there are no outliers who have exceedingly low or high FMTs. I'll use this table:
+
+```{r}
+controlled_FMT <- subset(new_resultOF, attempted >= 10)  
+
+head(controlled_FMT, 25)
+```
+
+
+```{r}
+tack_eff <- left_join(new_base, controlled_FMT, by = "ballCarrierDisplayName") 
+
+col <- c("misses", "attempted", "surrogate_key", "ballCarrierId")     #might want to keep bcid in
+tack_eff <- tack_eff %>% select(-col)
+
+head(tack_eff, 25)
+```
+Now, I will weight each tackle by the ball-carrier's FMT. This will allow us to calculate tacklers' percentile scores.
