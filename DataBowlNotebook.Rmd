@@ -110,23 +110,24 @@ missedF <- baseframe %>%
 resultF <- inner_join(tackleF, assistF, by = "displayName")
 resultF <- inner_join(resultF, missedF, by = "displayName")
 
-names(resultF) <- c("playerName", "tackles", "assists", "misses")
+names(resultF) <- c("displayName", "tackles", "assists", "misses")
 
 resultF <- resultF %>% mutate(attempted = tackles + assists + misses) ### BECAUSE SOME PLAYS A GUY DOES 2
 
 
-resultF <- resultF %>% arrange(playerName)
+resultF <- resultF %>% arrange(displayName)
 head(resultF,25)
 ```
 
 
 
-Now, I'll calculate their tackle percentage. Before doing this, I'll calculate their weighted tackle total, which counts assists as half a tackle.
+Now, I'll calculate their tackle percentage. Before doing this, I'll calculate their weighted tackle total, which counts assists as half a tackle. I'll also drop those with <25 tackle attempts.
 
 ```{r}
 resultF <- resultF %>% mutate(weightedTack = tackles + .5*assists)
 
 resultF <- resultF %>% mutate(tacklePerc = weightedTack / attempted)
+resultF <- resultF[resultF$attempted >= 25, , drop = FALSE]
 head(resultF, 25)
 ```
 
@@ -223,6 +224,53 @@ tack_eff <- left_join(new_base, controlled_FMT, by = "ballCarrierDisplayName")
 col <- c("misses", "attempted", "surrogate_key", "ballCarrierId")     #might want to keep bcid in
 tack_eff <- tack_eff %>% select(-col)
 
-head(tack_eff, 25)
+tack_eff <- tack_eff %>% arrange(displayName)
+head(tack_eff, 200)
 ```
 Now, I will weight each tackle by the ball-carrier's FMT. This will allow us to calculate tacklers' percentile scores.
+
+
+```{r}
+custom_count <- function(data, group_column, value_column) {
+  result <- data %>%
+    group_by({{group_column}}) %>%
+    filter(tackle==1) %>% 
+    summarise(Tsum = sum({{value_column}}, na.rm = TRUE), .groups = "drop")
+  return(result)
+}
+
+custom_count_assist <- function(data, group_column, value_column) {
+  result2 <- data %>%
+    group_by({{group_column}}) %>%
+    summarise(Asum = ifelse(any(assist == 1), sum({{value_column}}, na.rm = TRUE), 0), .groups = "drop")
+  return(result2)
+}
+
+
+result <- custom_count(tack_eff, displayName, FMT)
+result2 <- custom_count_assist(tack_eff, displayName, FMT)
+result2 <- result2 %>%
+  mutate_all(~ifelse(is.na(.), 0, .))
+result3 <- left_join(result, result2, by = "displayName")
+result3 <- result3 %>% mutate (sum = Tsum + .5* Asum)
+print(result3)
+
+```
+
+```{r}
+
+
+final_result <- left_join(resultF, result3, by = "displayName")
+
+final_result <- final_result %>% mutate(sinkingShips = sum / attempted)
+  
+
+#final_result <- final_result[final_result$attempted >= 25, , drop = FALSE]
+final_result <- final_result %>% arrange(desc(sinkingShips))
+col <- c("tackles", "assists", "misses", "attempted", "Tsum", "Asum")
+final_result <- final_result %>% select(-col)
+#final_result <- final_result %>% arrange(displayName)
+print(final_result)
+#head(final_result, 50)
+```
+
