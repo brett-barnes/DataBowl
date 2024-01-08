@@ -128,7 +128,8 @@ resultF <- resultF %>% mutate(weightedTack = tackles + .5*assists)
 
 resultF <- resultF %>% mutate(tacklePerc = weightedTack / attempted)
 resultF <- resultF[resultF$attempted >= 25, , drop = FALSE]
-head(resultF, 25)
+#head(resultF, 25)
+resultF
 ```
 
 Now, I will calculate ball-carriers' weighted forced missed tackle percentage (FMT). I will do this by joining the Plays database to my baseframe, then following similarly to how I calculated Weighted Tackle Percentage.
@@ -262,15 +263,74 @@ print(result3)
 
 final_result <- left_join(resultF, result3, by = "displayName")
 
-final_result <- final_result %>% mutate(sinkingShips = sum / attempted)
+final_result <- final_result %>% mutate(DATE = sum / attempted)
   
 
 #final_result <- final_result[final_result$attempted >= 25, , drop = FALSE]
-final_result <- final_result %>% arrange(desc(sinkingShips))
+final_result <- final_result %>% arrange(desc(DATE))
 col <- c("tackles", "assists", "misses", "attempted", "Tsum", "Asum")
 final_result <- final_result %>% select(-col)
 #final_result <- final_result %>% arrange(displayName)
 print(final_result)
+#head(final_result, 50)
+```
+
+Now, I can calculate OATE by weighting each Forced Missed Tackle by the Weighted Tackle percentage of the tackler.
+```{r}
+
+
+OATE_base <- left_join(new_base, resultF, by = "displayName")
+
+col <- c("tackles", "assists", "misses", "attempted", "nflId", "playId", "gameId")
+
+OATE_base <- OATE_base %>% select(-col)
+
+controlled_OATE <- subset(OATE_base, weightedTack > 0)
+
+# Reset the row indices
+controlled_OATE <- controlled_OATE[, , drop = FALSE]
+rownames(controlled_OATE) <- 1:nrow(controlled_OATE)
+
+# Print the result
+print(controlled_OATE)
+
+```
+
+```{r}
+custom_count <- function(data, group_column, value_column) {
+  result <- data %>%
+    group_by({{group_column}}) %>%
+    filter(missedTackle==1) %>% 
+    summarise(sum = sum({{value_column}}, na.rm = TRUE), .groups = "drop")
+  return(result)
+}
+
+
+result <- custom_count(controlled_OATE, ballCarrierDisplayName, tacklePerc)
+
+print(result)
+```
+
+
+```{r}
+O_final_result <- left_join(new_resultOF, result3, by = "ballCarrierDisplayName")
+
+O_final_result <- O_final_result %>% mutate(OATE = sum / attempted)
+  
+
+#final_result <- final_result[final_result$attempted >= 25, , drop = FALSE]
+O_final_result <- O_final_result %>% arrange(desc(OATE))
+col <- c("Tsum", "Asum")
+O_final_result <- O_final_result %>% select(-col)
+#final_result <- final_result %>% arrange(displayName)
+
+cfr2 <- subset(O_final_result, sum > 0)
+cfr <- subset(cfr2, attempted > 10)
+
+cfr <- cfr[, , drop = FALSE]
+rownames(cfr) <- 1:nrow(cfr)
+
+print(cfr)
 #head(final_result, 50)
 ```
 
