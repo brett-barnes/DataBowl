@@ -264,7 +264,8 @@ print(result3)
 final_result <- left_join(resultF, result3, by = "displayName")
 
 final_result <- final_result %>% mutate(DATE = sum / attempted)
-  
+  final_result <- final_result %>% mutate(DIFF = DATE - tacklePerc)
+
 
 #final_result <- final_result[final_result$attempted >= 25, , drop = FALSE]
 final_result <- final_result %>% arrange(desc(DATE))
@@ -313,19 +314,19 @@ print(result)
 
 
 ```{r}
-O_final_result <- left_join(new_resultOF, result3, by = "ballCarrierDisplayName")
+O_final_result <- left_join(new_resultOF, result, by = "ballCarrierDisplayName")
 
 O_final_result <- O_final_result %>% mutate(OATE = sum / attempted)
-  
+O_final_result <- O_final_result %>% mutate(DIFF = OATE - FMT)
 
 #final_result <- final_result[final_result$attempted >= 25, , drop = FALSE]
 O_final_result <- O_final_result %>% arrange(desc(OATE))
 col <- c("Tsum", "Asum")
-O_final_result <- O_final_result %>% select(-col)
+#O_final_result <- O_final_result %>% select(-col)
 #final_result <- final_result %>% arrange(displayName)
 
 cfr2 <- subset(O_final_result, sum > 0)
-cfr <- subset(cfr2, attempted > 10)
+cfr <- subset(cfr2, misses > 3)
 
 cfr <- cfr[, , drop = FALSE]
 rownames(cfr) <- 1:nrow(cfr)
@@ -333,4 +334,91 @@ rownames(cfr) <- 1:nrow(cfr)
 print(cfr)
 #head(final_result, 50)
 ```
+
+```{r}
+library(magrittr)
+library(ggplot2)
+library(ggrepel)
+```
+
+```{r}
+
+# Fraction of data to label (e.g., 25%)
+library(ggplot2)
+library(ggrepel)
+library(dplyr)
+
+# Fraction of data to label (e.g., 5%)
+label_fraction <- 0.05
+
+# Create a subset of the data with approximately 10% of the rows
+label_subset <- cfr %>% sample_frac(label_fraction)
+
+# Identify rows with maximum and minimum values
+max_row <- cfr[which.max(cfr$OATE), ]
+min_row <- cfr[which.min(cfr$OATE), ]
+
+scatter_plot <- cfr %>%
+  ggplot(aes(x = FMT, y = OATE)) +
+  geom_point(color = "blue", alpha = 0.6) +
+  geom_text_repel(data = label_subset,
+                  aes(label = ballCarrierDisplayName),
+                  size = 3,
+                  box.padding = 1,  # Adjust the box padding
+                  point.padding = 1) +  # Adjust the point padding
+  geom_text_repel(data = rbind(max_row, min_row),
+                  aes(label = ballCarrierDisplayName),
+                  size = 3,
+                  box.padding = 1,  # Adjust the box padding
+                  point.padding = 1,  # Adjust the point padding
+                  color = "red") +
+  labs(x = "FMT", y = "OATE") +
+  geom_vline(xintercept = mean(cfr$FMT, na.rm = TRUE), linetype = "dashed", color = "red") +
+  geom_hline(yintercept = mean(cfr$OATE, na.rm = TRUE), linetype = "dashed", color = "red") +
+  theme_minimal() +
+  coord_cartesian(xlim = c(min(cfr$FMT, na.rm = TRUE), max(cfr$FMT, na.rm = TRUE)),
+                  ylim = c(min(cfr$OATE, na.rm = TRUE), max(cfr$OATE, na.rm = TRUE)))
+
+# Print the scatter plot
+print(scatter_plot)
+
+```
+
+```{r}
+# Fraction of data to label (e.g., 5%)
+label_fraction <- 0.02
+
+# Create a subset of the data with approximately 5% of the rows
+label_subset <- final_result %>% sample_frac(label_fraction)
+
+# Identify rows with maximum and minimum values
+max_row <- final_result[which.max(final_result$DATE), ]
+min_row <- final_result[which.min(final_result$DATE), ]
+
+scatter_plot2 <- final_result %>%
+  ggplot(aes(x = tacklePerc, y = DATE)) +
+  geom_point(color = "blue", alpha = 0.6) +
+  geom_text_repel(data = label_subset,
+                  aes(label = displayName),
+                  size = 3,
+                  box.padding = 1,  # Adjust the box padding
+                  point.padding = 1) +  # Adjust the point padding
+  geom_text_repel(data = rbind(max_row, min_row),
+                  aes(label = displayName),  # Corrected the typo here
+                  size = 3,
+                  box.padding = 1,  # Adjust the box padding
+                  point.padding = 1,  # Adjust the point padding
+                  color = "red") +
+  labs(x = "Tackle %", y = "DATE") +
+  geom_vline(xintercept = mean(final_result$tacklePerc, na.rm = TRUE), linetype = "dashed", color = "red") +
+  geom_hline(yintercept = mean(final_result$DATE, na.rm = TRUE), linetype = "dashed", color = "red") +
+  theme_minimal() +
+  coord_cartesian(xlim = c(min(final_result$tacklePerc, na.rm = TRUE), max(final_result$tacklePerc, na.rm = TRUE)),
+                  ylim = c(min(final_result$DATE, na.rm = TRUE), max(final_result$DATE, na.rm = TRUE)))
+
+# Print the scatter plot
+print(scatter_plot2)
+
+```
+
 

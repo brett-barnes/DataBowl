@@ -32,7 +32,6 @@ library(dplyr)
 ```
 Now, I concatenate every week into one dataframe, joined to the tackle dataframe, and clean out unnecessary columns.
 ```{r}
-
 # Concatenating every week into one dataframe, joined to the tackle dataframe, and cleaning out unnecessary columns
 
 # Assuming 'gameId', 'playId', and 'nflId' are the columns you want to use for the surrogate key
@@ -50,7 +49,10 @@ totalList <- lapply(totalList, surrogate_key_function)
 # Load the tackles data
 tackles <- tackles %>%
   mutate(surrogate_key = paste0(gameId, playId, nflId))
+```
 
+
+```{r}
 # Initialize an empty dataframe to store the concatenated results
 combined_df <- data.frame()
 
@@ -72,26 +74,40 @@ combined_df <- combined_df %>%
 
 # Print the ordered combined dataframe
 head(combined_df, 25)
+```
 
 
+```{r}
 # Calculate missed tackle rate for each defender
 defender_missed_tackle_rate <- combined_df |>
   group_by(nflId.x) |>
   summarise(total_tackles = n(),
             total_missed_tackles = sum(event == "tackle"),
             missed_tackle_rate = total_missed_tackles / total_tackles)
+```
 
+
+```{r}
 # Filter ball carrier tackles where they forced a missed tackle
 ball_carrier_forced_missed_tackles <- combined_df |>
   filter(event %in% c("tackle", "out_of_bounds"))
+```
+
+```{r}
+ball_carrier_forced_missed_tackles
+```
+
+
+```{r}
+names(ball_carrier_forced_missed_tackles) <- c("gameId", "playId", "nflId", "tackle", "assist", "displayName", "club", "event")
 
 # Join the ball carrier's forced missed tackles with defender missed tackle rates
 ball_carrier_defenders_with_high_mtr <- ball_carrier_forced_missed_tackles |>
-  group_by(nflId.y) |>
+  group_by(nflId) |>
   summarise(defender_missed_tackles = sum(event == "tackle"),
             total_tackles = n()) |>
-  left_join(defender_missed_tackle_rate, by = c("nflId.y" = "nflId.x"))
+  left_join(defender_missed_tackle_rate, by = c("nflId" = "nflId.x"))
 
 # Print the results
-head(ball_carrier_defenders_with_high_mtr, 25)
-
+head(ball_carrier_defenders_with_high_mtr, 50)
+```
